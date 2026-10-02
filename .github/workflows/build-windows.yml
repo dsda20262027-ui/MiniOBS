@@ -1,0 +1,61 @@
+name: Build MiniOBS for Windows
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install PyInstaller
+        run: python -m pip install --upgrade pip pyinstaller
+
+      - name: Build MiniOBS.exe
+        shell: cmd
+        run: |
+          if exist build rmdir /s /q build
+          if exist dist rmdir /s /q dist
+          mkdir build
+          py -m PyInstaller --noconfirm --clean --onefile --windowed --name MiniOBS src\mini_obs.py
+          copy /Y dist\MiniOBS.exe build\MiniOBS.exe
+
+      - name: Build installer with Inno Setup
+        shell: pwsh
+        run: |
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup --no-progress -y
+          }
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            throw "Inno Setup compiler (ISCC.exe) was not found."
+          }
+          & $iscc "installer\MiniOBS.iss"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Inno Setup compilation failed."
+          }
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MiniOBS-Windows-Installer
+          path: installer/output/MiniOBS-Setup.exe
+          if-no-files-found: error
+
+      - name: Upload portable EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MiniOBS-Windows-EXE
+          path: build/MiniOBS.exe
+          if-no-files-found: error
