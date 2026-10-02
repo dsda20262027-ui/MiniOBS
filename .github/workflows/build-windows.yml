@@ -21,39 +21,36 @@ jobs:
       - name: Install PyInstaller
         run: python -m pip install --upgrade pip pyinstaller
 
-      - name: Build MiniOBS.exe
-        shell: cmd
-        run: |
-          if exist build rmdir /s /q build
-          if exist dist rmdir /s /q dist
-          mkdir build
-          py -m PyInstaller --noconfirm --clean --onefile --windowed --name MiniOBS src\mini_obs.py
-          copy /Y dist\MiniOBS.exe build\MiniOBS.exe
+      - name: Check Python source
+        run: python -m py_compile src/mini_obs.py
 
-      - name: Build installer with Inno Setup
+      - name: Build one-file EXE
+        run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name MiniOBS src/mini_obs.py
+
+      - name: Prepare EXE
         shell: pwsh
         run: |
-          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-          if (-not (Test-Path $iscc)) {
-            choco install innosetup --no-progress -y
-          }
-          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-          if (-not (Test-Path $iscc)) {
-            throw "Inno Setup compiler (ISCC.exe) was not found."
-          }
-          & $iscc "installer\MiniOBS.iss"
-          if ($LASTEXITCODE -ne 0) {
-            throw "Inno Setup compilation failed."
-          }
+          New-Item -ItemType Directory -Force build | Out-Null
+          Copy-Item dist/MiniOBS.exe build/MiniOBS.exe -Force
 
-      - name: Upload installer artifact
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "installer\MiniOBS.iss"
+
+      - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
           name: MiniOBS-Windows-Installer
           path: installer/output/MiniOBS-Setup.exe
           if-no-files-found: error
 
-      - name: Upload portable EXE artifact
+      - name: Upload one-file EXE
         uses: actions/upload-artifact@v4
         with:
           name: MiniOBS-Windows-EXE
